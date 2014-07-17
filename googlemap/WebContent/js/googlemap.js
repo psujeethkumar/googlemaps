@@ -6,7 +6,7 @@ var positionOptions = {
 
 /* Map options */
 var mapOptions = {
-	zoom : 14,
+	zoom : 14
 };
 
 /* Drawing control options */
@@ -55,9 +55,9 @@ var rectangleOptions = {
 	strokeColor : "red"
 };
 
-/* Marker options */
-var markerOptions = {
-	title : "I am here !",
+/* User location Marker options */
+var currentPositionOptions = {
+	title : "You are here !",
 	animation : google.maps.Animation.BOUNCE
 };
 
@@ -74,7 +74,7 @@ var initalDrawingManagerOptions = {
 /* Drawing manager options after drawing */
 var afterDrawingManagerOptions = {
 	drawingMode : null,
-	drawingControl : false,
+	drawingControl : false
 };
 
 /* Function to initialize maps */
@@ -91,9 +91,21 @@ var currentLocation = null;
 /* Variable to hold map object */
 var map = null;
 /* Variable to hold marker object */
-var marker = null;
+var currentPositionMarker = null;
 /* Variable to hold drawing manager object */
 var drawingManager = null;
+/* Variable to hold place search service object */
+var placeSearchService = null;
+/* Variable to hold results info window */
+var infoWindow = null;
+/* Variable to hold circle object resizing */
+var circle = null;
+/* Variable to hold search results */
+var searchPlaceResults = null;
+/* Variable to hold search result markers */
+var searchPlaceResultMarkers = {};
+/* Variable to hold previous circle radius */
+var radius = 0;
 
 /* Function to process map */
 function processIntialMap(position) {
@@ -103,10 +115,10 @@ function processIntialMap(position) {
 	map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
 	// Set center of map to user current location.
 	map.setCenter(currentLocation);
-	marker = new google.maps.Marker(markerOptions);
-	marker.setPosition(currentLocation);
+	currentPositionMarker = new google.maps.Marker(currentPositionOptions);
+	currentPositionMarker.setPosition(currentLocation);
 	// Set marker to map
-	marker.setMap(map);
+	currentPositionMarker.setMap(map);
 	// Add drawing controls to map
 	drawingManager.setMap(map);
 	// Listener for listening events when center changed
@@ -118,12 +130,77 @@ function processIntialMap(position) {
 /* Method for processing set map center as current location */
 function processMapChangedEvent() {
 	window.setTimeout(function() {
-		map.panTo(marker.getPosition());
-	}, 2000);
+		map.panTo(currentPositionMarker.getPosition());
+	}, 2500);
 };
 
 /* Method to process event after circle is drawn */
-function processCircleComplete(circle) {
+function processCircleComplete(completedcircle) {
+	circle = completedcircle;
+	radius = completedcircle.getRadius();
 	circle.setCenter(currentLocation);
+	google.maps.event.addListener(circle, 'radius_changed', processCircleResize);
 	drawingManager.setOptions(afterDrawingManagerOptions);
+	searchPlaces(circle.getRadius());
+};
+
+/* Method for processing circle resized */
+function processCircleResize() {
+	if (circle.getRadius() > radius) {
+		searchPlaces(circle.getRadius());
+	} else {
+		for ( var place_id in searchPlaceResultMarkers) {
+			var distance = google.maps.geometry.spherical.computeDistanceBetween(circle.getCenter(), searchPlaceResultMarkers[place_id].getPosition());
+			if (distance - circle.getRadius() > 0) {
+				searchPlaceResultMarkers[place_id].setMap(null);
+				delete searchPlaceResultMarkers[place_id];
+			}
+		}
+	}
+	radius = circle.getRadius();
+};
+
+/* Function to search places */
+function searchPlaces(circleRadius) {
+	/* Place search request object */
+	var placeSearchRequest = {
+		location : currentLocation,
+		radius : circleRadius,
+	};
+	placeSearchService = new google.maps.places.PlacesService(map);
+	placeSearchService.nearbySearch(placeSearchRequest, processSearchResponses);
+};
+
+/* Process results */
+function processSearchResponses(places, status) {
+	searchPlaceResults = places;
+	if (status == google.maps.places.PlacesServiceStatus.OK) {
+		for (var i = 0; i < places.length; i++) {
+			var distance = google.maps.geometry.spherical.computeDistanceBetween(currentLocation, searchPlaceResults[i].geometry.location);
+			if (distance < circle.getRadius()) {
+				addSearchResultMarker(places[i]);
+			}
+		}
+	}
+};
+
+/* Create marker and add them on the map */
+function addSearchResultMarker(place) {
+	var searchPlaceMarker = new google.maps.Marker({
+		map : map,
+		position : place.geometry.location,
+		animation : google.maps.Animation.DROP
+	});
+	searchPlaceResultMarkers[place.place_id] = searchPlaceMarker;
+	infowindow = new google.maps.InfoWindow();
+	google.maps.event.addListener(searchPlaceMarker, 'click', function() {
+		infowindow.setContent(place.name);
+		infowindow.open(map, this);
+	});
+};
+
+/* Remove marker and add them on the map */
+function removeSearchResultMarker(place) {
+	var markers = $('#map-canvas').gmap('get', 'markers');
+	alert(markers);
 };
