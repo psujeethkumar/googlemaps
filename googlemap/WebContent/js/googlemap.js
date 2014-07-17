@@ -4,9 +4,34 @@ var positionOptions = {
 	timeout : 10 * 1000
 };
 
+/* Map style array object */
+var mapStyles = [ {
+	stylers : [ {
+		hue : "#00ffe6"
+	}, {
+		saturation : -20
+	} ]
+}, {
+	featureType : "road",
+	elementType : "geometry",
+	stylers : [ {
+		lightness : 100
+	}, {
+		visibility : "simplified"
+	} ]
+}, {
+	featureType : "road",
+	elementType : "labels",
+	stylers : [ {
+		visibility : "off"
+	} ]
+} ];
+
 /* Map options */
 var mapOptions = {
-	zoom : 14
+	zoom : 14,
+	disableDefaultUI : true,
+	styles : mapStyles
 };
 
 /* Drawing control options */
@@ -77,15 +102,6 @@ var afterDrawingManagerOptions = {
 	drawingControl : false
 };
 
-/* Function to initialize maps */
-$(document).ready(function() {
-	if (navigator.geolocation) {
-		navigator.geolocation.getCurrentPosition(processIntialMap);
-	} else {
-		error('Your browser do not support this application. Please update !');
-	}
-});
-
 /* Variable to hold current location */
 var currentLocation = null;
 /* Variable to hold map object */
@@ -106,6 +122,15 @@ var searchPlaceResults = null;
 var searchPlaceResultMarkers = {};
 /* Variable to hold previous circle radius */
 var radius = 0;
+
+/* Function to initialize maps */
+$(document).ready(function() {
+	if (navigator.geolocation) {
+		navigator.geolocation.getCurrentPosition(processIntialMap, null, positionOptions);
+	} else {
+		error('Your browser do not support this application. Please update !');
+	}
+});
 
 /* Function to process map */
 function processIntialMap(position) {
@@ -149,13 +174,7 @@ function processCircleResize() {
 	if (circle.getRadius() > radius) {
 		searchPlaces(circle.getRadius());
 	} else {
-		for ( var place_id in searchPlaceResultMarkers) {
-			var distance = google.maps.geometry.spherical.computeDistanceBetween(circle.getCenter(), searchPlaceResultMarkers[place_id].getPosition());
-			if (distance - circle.getRadius() > 0) {
-				searchPlaceResultMarkers[place_id].setMap(null);
-				delete searchPlaceResultMarkers[place_id];
-			}
-		}
+		removeSearchResultMarker();
 	}
 	radius = circle.getRadius();
 };
@@ -165,7 +184,7 @@ function searchPlaces(circleRadius) {
 	/* Place search request object */
 	var placeSearchRequest = {
 		location : currentLocation,
-		radius : circleRadius,
+		radius : circleRadius
 	};
 	placeSearchService = new google.maps.places.PlacesService(map);
 	placeSearchService.nearbySearch(placeSearchRequest, processSearchResponses);
@@ -189,7 +208,9 @@ function addSearchResultMarker(place) {
 	var searchPlaceMarker = new google.maps.Marker({
 		map : map,
 		position : place.geometry.location,
-		animation : google.maps.Animation.DROP
+		icon : 'http://maps.google.com/mapfiles/marker_blackA.png'
+
+	// animation : google.maps.Animation.DROP
 	});
 	searchPlaceResultMarkers[place.place_id] = searchPlaceMarker;
 	infowindow = new google.maps.InfoWindow();
@@ -200,7 +221,12 @@ function addSearchResultMarker(place) {
 };
 
 /* Remove marker and add them on the map */
-function removeSearchResultMarker(place) {
-	var markers = $('#map-canvas').gmap('get', 'markers');
-	alert(markers);
+function removeSearchResultMarker() {
+	for ( var place_id in searchPlaceResultMarkers) {
+		var distance = google.maps.geometry.spherical.computeDistanceBetween(circle.getCenter(), searchPlaceResultMarkers[place_id].getPosition());
+		if (distance - circle.getRadius() >= -10) {
+			searchPlaceResultMarkers[place_id].setMap(null);
+			delete searchPlaceResultMarkers[place_id];
+		}
+	}
 };
