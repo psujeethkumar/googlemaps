@@ -1,0 +1,13 @@
+@CHARSET "ISO-8859-1";
+
+html {
+	height: 100%
+}
+
+body {
+	height: 100%
+}
+
+#map-canvas {
+	height: 100%
+}
